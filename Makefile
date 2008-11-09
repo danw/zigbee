@@ -40,4 +40,4 @@ realclean: clean
 $(OBJECT_FILES): $(HEADER_FILE)
 
 erlang:
-	erlc +debug_info serial.erl zigbee.erl
+	erlc +export_all +debug_info serial.erl zigbee.erl
