@@ -19,15 +19,16 @@ init({File}) ->
 	CallTable = ets:new(calltable, []),
 	{ok, #state{serial=Serial,calltable=CallTable}}.
 
-handle_call({at_command, [A,T]}, From, State) ->
-	{FrameID, NewState} = next_frame_id(State),
-	ets:insert(State#state.calltable, {FrameID, From}),
-	write_packet(<<16#08, FrameID:8, A, T>>, State),
-	{noreply, NewState};
-handle_call({at_command_set, [A,T], Data}, From, State) ->
+handle_call({at_command, [A,T], Data}, From, State) ->
 	{FrameID, NewState} = next_frame_id(State),
 	ets:insert(State#state.calltable, {FrameID, From}),
 	write_packet(<<16#08, FrameID:8, A, T, Data/binary>>, State),
+	{noreply, NewState};
+handle_call({remote_at_command, <<NetAddr:2/binary>>, [A,T], Data}, From, State) ->
+	{FrameID, NewState} = next_frame_id(State),
+	ets:insert(State#state.calltable, {FrameID, From}),
+	DestAddr = 16#FFFF,
+	write_packet(<<16#17, FrameID:8, DestAddr:64, NetAddr:2/binary, 2:8, A, T, Data/binary>>, State),
 	{noreply, NewState};
 handle_call(_Request, _From, State) ->
 	{reply, {error, badcall}, State}.
@@ -90,19 +91,18 @@ interpret_packet(Unknown, _State) ->
 interpret_api_packet(Contents, State) ->
 	{Type, Details} = decode_packet(Contents),
 	case Type of
-		at_command_response ->
+		_ when Type =:= at_command_response; Type =:= remote_at_command_response ->
 			io:format("Got ~w packet: ~w~n", [Type, Details]),
 			Dict = dict:from_list(Details),
 			FrameID = dict:fetch(frameid, Dict),
 			{FrameID, ResponseTo} = hd(ets:lookup(State#state.calltable, FrameID)),
-			case dict:fetch(status, Dict) of
+			Response = case dict:fetch(status, Dict) of
 				ok ->
-					Data = decode_at_command_response_data(dict:fetch(at_command, Dict), dict:fetch(data, Dict)),
-					Response = {ok, Data};
+					{ok, dict:fetch(data, Dict)};
 				{error, Reason} ->
-					Response = {error, Reason};
+					{error, Reason};
 				unknown ->
-					Response = {unknown, dict:fetch(data, Dict)}
+					{unknown, dict:fetch(data, Dict)}
 			end,
 			gen_server:reply(ResponseTo, Response);
 		_Else ->
@@ -115,9 +115,14 @@ decode_packet(<<16#88, FrameID:8, Command1:8, Command2:8, Status:8, Data/binary>
 	{at_command_response, [	{frameid, FrameID},
 	 						{at_command, [Command1,Command2]},
 							{status, decode_packet_status(at_command_response, Status)},
-							{data, Data}]};
-decode_packet(<<16#97, _FrameID:8, _RemoteAddr:64, _NetAddr:16, _Command:16/binary, _Status:8, _Data/binary>>) ->
-	{remote_at_command_response, []};
+							{data, decode_at_command_response_data([Command1,Command2], Data)}]};
+decode_packet(<<16#97, FrameID:8, RemoteAddr:64, NetAddr:16, Command1:8, Command2:8, Status:8, Data/binary>>) ->
+	{remote_at_command_response, [	{frameid, FrameID},
+									{remoteaddr, RemoteAddr},
+									{netaddr, NetAddr},
+									{at_command, [Command1, Command2]},
+									{status, decode_packet_status(at_command_response, Status)},
+									{data, decode_at_command_response_data([Command1,Command2], Data)}]};
 decode_packet(<<16#8b, _FrameID:8, _NetAddr:16, _RetryCount:8, _DeliveryStatus:8, _DiscoveryStatus:8>>) ->
 	{transmit_status, []};
 decode_packet(<<16#90, _Address:64, _NetAddr:16, _Options:8, _Data/binary>>) ->
@@ -182,7 +187,13 @@ decode_device_type(2) ->
 
 %%% External API
 at_command(Pid, AT) when is_list(AT), length(AT) =:= 2 ->
-	gen_server:call(Pid, {at_command, AT}).
+	at_command(Pid, AT, <<>>).
 
-at_command(Pid, AT, Data) when is_list(AT), length(AT) =:= 2 ->
-	gen_server:call(Pid, {at_command_set, AT, Data}).
+at_command(Pid, AT, Data) when is_list(AT), length(AT) =:= 2, is_binary(Data) ->
+	gen_server:call(Pid, {at_command, AT, Data}).
+
+remote_at_command(Pid, <<NetAddr:2/binary>>, AT) when is_list(AT), length(AT) =:= 2 ->
+	remote_at_command(Pid, NetAddr, AT, <<>>).
+
+remote_at_command(Pid, <<NetAddr:2/binary>>, AT, Data) when is_list(AT), length(AT) =:= 2, is_binary(Data) ->
+	gen_server:call(Pid, {remote_at_command, NetAddr, AT, Data}).
