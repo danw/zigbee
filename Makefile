@@ -1,43 +1,10 @@
-#  File:	 Makefile
-#  Author:	 Johan Bevemyr
-#  Created:	 Fri Oct 18 09:59:34 1996
- 
-
-CC = gcc
-# roland
-LINK.c = gcc
-
-WARNING_OPTIONS =
-LANGUAGE_OPTIONS = 
-COMPILER_OPTIONS = -g
-
-CFLAGS   = $(WARNING_OPTIONS) $(LANGUAGE_OPTIONS) $(COMPILER_OPTIONS)
-
-######################################################################
-
-HEADER_FILES = serial.h
-SOURCE_FILES = serial.c
-
-OBJECT_FILES = $(SOURCE_FILES:.c=.o)
-
-######################################################################
-
 all: serial erlang
 
-serial : $(OBJECT_FILES)
-	$(LINK.c) -o $@ $(LDFLAGS) $(OBJECT_FILES) $(LDLIBS)
+serial: serial.c serial.h
+	gcc -o serial -ggdb serial.c
 
-clean : 
-	/bin/rm -f $(OBJECT_FILES)
-	/bin/rm -f *.beam
-
-# roland
-serial.o: serial.c serial.h
-
-realclean: clean
-	/bin/rm -f serial
-
-$(OBJECT_FILES): $(HEADER_FILE)
-
-erlang:
+erlang: serial.erl zigbee.erl serial.hrl
 	erlc +export_all +debug_info serial.erl zigbee.erl
+
+clean:
+	rm -rf serial serial.dSYM *.beam
