@@ -48,11 +48,11 @@ handle_call({at_command, [A,T], Data}, From, State) ->
 	ets:insert(State#state.calltable, {FrameID, From}),
 	write_packet(<<16#08, FrameID:8, A, T, Data/binary>>, State),
 	{noreply, NewState};
-handle_call({remote_at_command, <<NetAddr:2/binary>>, [A,T], Data}, From, State) ->
+handle_call({remote_at_command, NetAddr, [A,T], Data}, From, State) ->
 	{FrameID, NewState} = next_frame_id(State),
 	ets:insert(State#state.calltable, {FrameID, From}),
 	DestAddr = 16#FFFF,
-	write_packet(<<16#17, FrameID:8, DestAddr:64, NetAddr:2/binary, 2:8, A, T, Data/binary>>, State),
+	write_packet(<<16#17, FrameID:8, DestAddr:64, NetAddr:16, 2:8, A, T, Data/binary>>, State),
 	{noreply, NewState};
 handle_call(_Request, _From, State) ->
 	{reply, {error, badcall}, State}.
@@ -216,8 +216,8 @@ at_command(Pid, AT) when is_list(AT), length(AT) =:= 2 ->
 at_command(Pid, AT, Data) when is_list(AT), length(AT) =:= 2, is_binary(Data) ->
 	gen_server:call(Pid, {at_command, AT, Data}).
 
-remote_at_command(Pid, <<NetAddr:2/binary>>, AT) when is_list(AT), length(AT) =:= 2 ->
+remote_at_command(Pid, NetAddr, AT) when is_list(AT), length(AT) =:= 2 ->
 	remote_at_command(Pid, NetAddr, AT, <<>>).
 
-remote_at_command(Pid, <<NetAddr:2/binary>>, AT, Data) when is_list(AT), length(AT) =:= 2, is_binary(Data) ->
+remote_at_command(Pid, NetAddr, AT, Data) when is_list(AT), length(AT) =:= 2, is_binary(Data) ->
 	gen_server:call(Pid, {remote_at_command, NetAddr, AT, Data}).
