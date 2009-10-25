@@ -35,7 +35,7 @@ start() ->
 	start("/dev/tty.usbserial-A6005vO3").
 
 start(File) ->
-	gen_server:start(?MODULE, {File}, []).
+	gen_server:start({local, ?MODULE}, ?MODULE, {File}, []).
 
 init({File}) ->
 	process_flag(trap_exit, true),
@@ -210,14 +210,14 @@ decode_device_type(2) ->
 	end_device.
 
 %%% External API
-at_command(Pid, AT) when is_list(AT), length(AT) =:= 2 ->
-	at_command(Pid, AT, <<>>).
+at_command(AT) when is_list(AT), length(AT) =:= 2 ->
+	at_command(AT, <<>>).
 
-at_command(Pid, AT, Data) when is_list(AT), length(AT) =:= 2, is_binary(Data) ->
-	gen_server:call(Pid, {at_command, AT, Data}).
+at_command(AT, Data) when is_list(AT), length(AT) =:= 2, is_binary(Data) ->
+	gen_server:call(?MODULE, {at_command, AT, Data}).
 
-remote_at_command(Pid, NetAddr, AT) when is_list(AT), length(AT) =:= 2 ->
-	remote_at_command(Pid, NetAddr, AT, <<>>).
+remote_at_command(NetAddr, AT) when is_list(AT), length(AT) =:= 2 ->
+	remote_at_command(NetAddr, AT, <<>>).
 
-remote_at_command(Pid, NetAddr, AT, Data) when is_list(AT), length(AT) =:= 2, is_binary(Data) ->
-	gen_server:call(Pid, {remote_at_command, NetAddr, AT, Data}).
+remote_at_command(NetAddr, AT, Data) when is_list(AT), length(AT) =:= 2, is_binary(Data) ->
+	gen_server:call(?MODULE, {remote_at_command, NetAddr, AT, Data}).
