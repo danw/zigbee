@@ -3,3 +3,19 @@ The erlang library itself(zigbee.erl) is licensed under GPL-2.
 
 Serial code comes from http://www.erlang.org/user.html - serial-1.0.
 It does not fall under the GPL-2 license.
+
+My configuration (the only one that's (only partially) supported right now)
+
+  Zigbee ZB Coordinator API Mode
+    Connected to a USB Serial adapter
+    VR = 2164 (SW Version)
+    HV = 1941 (HW Version)
+    AO = 1
+
+  Zigbee ZB Router AT Mode
+    Connected to an Arduino pro mini from sparkfun
+    DIO3 connected to Arduino reset pin
+    DH = 0
+    DL = 0
+
+I think that covers everything unique about my setup.
